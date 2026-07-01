@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>速読道場 ― SOKUDOKU</title>
+<style>
+  :root{
+    --bg:#f6f7f9; --bg2:#e9edf2;
+    --text:#1b1f27; --sub:#6b7280; --faint:#9aa1ac;
+    --card:#ffffff; --line:#e3e7ee;
+    --accent:#2f5d8f; --accent-soft:#eaf1f8;
+    --good:#2f9e6f; --bad:#c0503f; --gold:#c98a1a;
+    --shadow:0 1px 2px rgba(24,32,48,.04),0 8px 24px rgba(24,32,48,.06);
+    --mono:ui-monospace,"SFMono-Regular",Menlo,Consolas,"Roboto Mono",monospace;
+  }
+  body[data-theme="sakura"]{ --bg:#fdf6f8; --bg2:#f7e6ec; --accent:#c25d84; --accent-soft:#fbeef3; }
+  body[data-theme="wakaba"]{ --bg:#f4faf6; --bg2:#e3f2e8; --accent:#2f9e6f; --accent-soft:#e9f6ee; }
+  body[data-theme="yozora"]{ --bg:#141824; --bg2:#0d1017; --text:#eef1f6; --sub:#9aa4b6; --faint:#6b7484;
+    --card:#1e2432; --line:#2c3446; --accent:#7aa7d8; --accent-soft:#232c3e; }
+
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif;
+    color:var(--text);
+    background:linear-gradient(180deg,var(--bg),var(--bg2));
+    background-attachment:fixed;
+    min-height:100vh; line-height:1.7;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:560px;margin:0 auto;padding:18px 16px 60px}
+  .num{font-variant-numeric:tabular-nums;font-family:var(--mono)}
+  .screen{display:none;animation:fade .28s ease}
+  .screen.on{display:block}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+  /* header */
+  .top{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+  .brand{font-weight:800;letter-spacing:.04em;font-size:19px}
+  .brand small{display:block;font-size:10px;letter-spacing:.35em;color:var(--faint);font-weight:600;margin-top:2px}
+  .wallet{display:flex;gap:8px}
+  .chip{background:var(--card);border:1px solid var(--line);border-radius:999px;padding:5px 11px;font-size:12px;font-weight:700;box-shadow:var(--shadow);display:flex;align-items:center;gap:5px}
+  .chip .v{color:var(--accent)}
+
+  /* menu tiles */
+  .lead{font-size:13px;color:var(--sub);margin:0 2px 14px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+  .tile{
+    position:relative;text-align:left;cursor:pointer;
+    background:var(--card);border:1px solid var(--line);border-radius:16px;
+    padding:15px 14px;box-shadow:var(--shadow);transition:transform .12s,border-color .12s;
+    color:inherit;font:inherit;
+  }
+  .tile:active{transform:scale(.98)}
+  .tile .no{font-family:var(--mono);font-size:11px;color:var(--faint);letter-spacing:.1em}
+  .tile .ic{font-size:22px;line-height:1;margin:6px 0 8px}
+  .tile .tt{font-weight:800;font-size:15px;margin-bottom:2px}
+  .tile .ds{font-size:11.5px;color:var(--sub);line-height:1.5}
+  .tile.soon{opacity:.62}
+  .tile.soon::after{content:"工事中";position:absolute;top:11px;right:11px;font-size:10px;font-weight:800;color:var(--gold);background:rgba(201,138,26,.12);padding:2px 7px;border-radius:999px;letter-spacing:.08em}
+
+  .daily-strip{margin-top:16px;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;box-shadow:var(--shadow);cursor:pointer}
+  .daily-strip .h{display:flex;justify-content:space-between;align-items:center;font-weight:800;font-size:14px}
+  .bar{height:7px;background:var(--accent-soft);border-radius:999px;margin-top:10px;overflow:hidden}
+  .bar>i{display:block;height:100%;background:var(--accent);border-radius:999px;transition:width .4s}
+
+  /* generic */
+  h2.title{font-size:18px;margin:2px 0 2px;font-weight:800}
+  .sub{color:var(--sub);font-size:13px;margin:0 0 16px}
+  .back{background:none;border:none;color:var(--sub);font:inherit;font-size:13px;font-weight:700;cursor:pointer;padding:6px 2px;margin-bottom:6px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;box-shadow:var(--shadow);margin-bottom:12px}
+  .btn{display:block;width:100%;text-align:center;background:var(--accent);color:#fff;border:none;border-radius:12px;padding:14px;font:inherit;font-size:15px;font-weight:800;cursor:pointer;transition:transform .1s,opacity .1s}
+  .btn:active{transform:scale(.985)}
+  .btn.ghost{background:var(--card);color:var(--text);border:1px solid var(--line)}
+  .btn:disabled{opacity:.45;cursor:default}
+  .row{display:flex;gap:10px}
+  .row>*{flex:1}
+
+  /* stage picker */
+  .stage{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:13px 4px;border-bottom:1px solid var(--line);cursor:pointer}
+  .stage:last-child{border-bottom:none}
+  .stage .m .st{font-weight:800;font-size:15px}
+  .stage .m .sd{font-size:11.5px;color:var(--sub)}
+  .genre{font-size:10.5px;font-weight:800;color:var(--accent);background:var(--accent-soft);padding:3px 9px;border-radius:999px;white-space:nowrap}
+  .best{font-size:11px;color:var(--faint);font-family:var(--mono);white-space:nowrap}
+
+  /* speedrun reader */
+  .timer{font-family:var(--mono);font-size:34px;font-weight:700;text-align:center;letter-spacing:.02em;transition:transform .18s}
+  .timer.stop{transform:scale(1.06);color:var(--accent)}
+  .reader{
+    min-height:210px;display:flex;align-items:center;justify-content:center;text-align:center;
+    font-size:20px;line-height:2.0;padding:18px 6px;cursor:pointer;user-select:none;
+  }
+  .reader .blk{animation:blk .18s ease}
+  @keyframes blk{from{opacity:0}to{opacity:1}}
+  .progress-dots{display:flex;gap:5px;justify-content:center;margin-top:4px}
+  .progress-dots i{width:6px;height:6px;border-radius:50%;background:var(--line)}
+  .progress-dots i.done{background:var(--accent)}
+  .hint{text-align:center;color:var(--faint);font-size:12px;margin-top:10px}
+
+  /* quiz */
+  .q{font-weight:800;font-size:16px;margin-bottom:12px}
+  .opt{display:block;width:100%;text-align:left;background:var(--card);border:1.5px solid var(--line);border-radius:12px;padding:13px 14px;font:inherit;font-size:14px;margin-bottom:9px;cursor:pointer;transition:border-color .12s,background .12s}
+  .opt:active{transform:scale(.99)}
+  .opt.correct{border-color:var(--good);background:rgba(47,158,111,.08)}
+  .opt.wrong{border-color:var(--bad);background:rgba(192,80,63,.08)}
+  .opt:disabled{cursor:default}
+  .qmeta{display:flex;justify-content:space-between;font-size:12px;color:var(--sub);margin-bottom:14px;font-weight:700}
+
+  /* result */
+  .score-big{font-family:var(--mono);font-size:48px;font-weight:700;text-align:center;color:var(--accent);line-height:1.1}
+  .score-lbl{text-align:center;color:var(--sub);font-size:12px;letter-spacing:.2em;font-weight:700;margin-bottom:14px}
+  .stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin:6px 0 4px}
+  .stat{text-align:center;padding:10px 4px;background:var(--accent-soft);border-radius:12px}
+  .stat .v{font-family:var(--mono);font-weight:700;font-size:18px}
+  .stat .l{font-size:10.5px;color:var(--sub);font-weight:700}
+  .newbest{text-align:center;color:var(--gold);font-weight:800;font-size:13px;margin:8px 0}
+
+  /* rank list */
+  .rk{display:flex;align-items:center;gap:10px;padding:10px 2px;border-bottom:1px solid var(--line);font-size:14px}
+  .rk:last-child{border-bottom:none}
+  .rk .p{font-family:var(--mono);font-weight:700;width:26px;color:var(--faint)}
+  .rk .p.top{color:var(--gold)}
+  .rk .t{flex:1;font-family:var(--mono);font-weight:700}
+  .rk .a{color:var(--sub);font-size:12px;width:44px;text-align:right}
+  .rk .s{font-family:var(--mono);font-weight:800;color:var(--accent);width:56px;text-align:right}
+
+  /* vocab combo */
+  .combo{text-align:center;margin-bottom:6px}
+  .combo .n{font-family:var(--mono);font-size:40px;font-weight:700;line-height:1;transition:transform .12s}
+  .combo .n.pop{transform:scale(1.18);color:var(--accent)}
+  .combo .l{font-size:11px;color:var(--sub);letter-spacing:.25em;font-weight:700}
+  .tbar{height:6px;background:var(--accent-soft);border-radius:999px;overflow:hidden;margin:14px 0}
+  .tbar>i{display:block;height:100%;background:var(--accent);width:100%}
+  .sentence{font-size:19px;line-height:2;text-align:center;margin:8px 0 18px;min-height:76px;display:flex;align-items:center;justify-content:center}
+  .blank{display:inline-block;min-width:64px;border-bottom:3px solid var(--accent);margin:0 4px;vertical-align:bottom}
+
+  /* vision game */
+  .vfield{position:relative;height:340px;background:var(--card);border:1px solid var(--line);border-radius:16px;overflow:hidden;box-shadow:var(--shadow);margin-bottom:12px}
+  .fix{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:14px;height:14px;border-radius:50%;background:var(--bad)}
+  .fix.calm{background:var(--accent)}
+  .flashword{position:absolute;transform:translate(-50%,-50%);font-weight:800;font-size:22px;color:var(--text);animation:pop .12s ease}
+  @keyframes pop{from{opacity:.3}to{opacity:1}}
+  .vcenter{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;color:var(--sub);font-size:14px;font-weight:700;width:80%}
+  .vhud{position:absolute;top:10px;left:0;right:0;display:flex;justify-content:space-between;padding:0 14px;font-family:var(--mono);font-size:13px;font-weight:700}
+  .vhud .lives{color:var(--bad)}
+
+  /* daily */
+  .quest{display:flex;align-items:center;gap:12px;padding:14px 2px;border-bottom:1px solid var(--line)}
+  .quest:last-child{border-bottom:none}
+  .qcheck{width:24px;height:24px;border-radius:50%;border:2px solid var(--line);flex:0 0 auto;display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;font-weight:900}
+  .qcheck.done{background:var(--good);border-color:var(--good)}
+  .quest .qm{flex:1}
+  .quest .qm .qt{font-weight:800;font-size:14px}
+  .quest .qm .qp{font-size:11.5px;color:var(--sub)}
+  .quest .rw{font-size:11px;font-weight:800;color:var(--gold);white-space:nowrap}
+
+  .theme-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .theme{border:1.5px solid var(--line);border-radius:12px;padding:12px;cursor:pointer;background:var(--card)}
+  .theme.cur{border-color:var(--accent)}
+  .theme.lock{opacity:.55}
+  .theme .sw{height:26px;border-radius:8px;margin-bottom:8px}
+  .theme .tn{font-weight:800;font-size:13px}
+  .theme .tl{font-size:11px;color:var(--sub)}
+
+  /* toast */
+  #toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(80px);background:var(--text);color:var(--bg);padding:11px 18px;border-radius:999px;font-size:13px;font-weight:800;box-shadow:var(--shadow);opacity:0;transition:.3s;z-index:50;pointer-events:none}
+  #toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ======= HOME ======= -->
+  <section id="home" class="screen on">
+    <div class="top">
+      <div class="brand">速読道場<small>SOKUDOKU DOJO</small></div>
+      <div class="wallet">
+        <div class="chip">💎<span class="v" id="w-gems">0</span></div>
+        <div class="chip">⚡<span class="v" id="w-sp">0</span></div>
+      </div>
+    </div>
+    <p class="lead">読むことを、競技に。毎日すこしずつ、速く・深く。</p>
+    <div class="grid" id="menu"></div>
+
+    <div class="daily-strip" onclick="go('daily')">
+      <div class="h"><span>🏆 デイリークエスト</span><span class="num" id="daily-frac" style="color:var(--accent)">0/3</span></div>
+      <div class="bar"><i id="daily-bar" style="width:0%"></i></div>
+    </div>
+  </section>
+
+  <!-- ======= SPEEDRUN: stage select ======= -->
+  <section id="sr-stages" class="screen">
+    <button class="back" onclick="go('home')">← もどる</button>
+    <h2 class="title">スピードラン読書</h2>
+    <p class="sub">文章を読み切り、理解度クイズに答える。タイム × 正答率でスコアが決まる。</p>
+    <div class="card" id="sr-stage-list"></div>
+  </section>
+
+  <!-- ======= SPEEDRUN: reading ======= -->
+  <section id="sr-read" class="screen">
+    <div class="timer num" id="sr-timer">0.00</div>
+    <div class="progress-dots" id="sr-dots"></div>
+    <div class="card"><div class="reader" id="sr-reader" onclick="srNext()"></div></div>
+    <p class="hint">画面をタップ／スペースキーで次へ</p>
+  </section>
+
+  <!-- ======= SPEEDRUN: quiz ======= -->
+  <section id="sr-quiz" class="screen">
+    <div class="qmeta"><span>理解度クイズ</span><span id="sr-qcount">1 / 3</span></div>
+    <div class="card">
+      <div class="q" id="sr-q"></div>
+      <div id="sr-opts"></div>
+    </div>
+  </section>
+
+  <!-- ======= SPEEDRUN: result ======= -->
+  <section id="sr-result" class="screen">
+    <div class="card">
+      <div class="score-big num" id="sr-score">0</div>
+      <div class="score-lbl">SCORE</div>
+      <div id="sr-newbest"></div>
+      <div class="stats">
+        <div class="stat"><div class="v num" id="sr-time">0.0</div><div class="l">タイム</div></div>
+        <div class="stat"><div class="v num" id="sr-acc">0%</div><div class="l">正答率</div></div>
+        <div class="stat"><div class="v num" id="sr-wpm">0</div><div class="l">字/分</div></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="qmeta"><span>ランキング（このステージ）</span><span id="sr-genre"></span></div>
+      <div id="sr-rank"></div>
+    </div>
+    <div class="row">
+      <button class="btn ghost" onclick="go('sr-stages')">ステージ選択</button>
+      <button class="btn" id="sr-retry">もう一度</button>
+    </div>
+  </section>
+
+  <!-- ======= VOCAB ======= -->
+  <section id="vc-start" class="screen">
+    <button class="back" onclick="go('home')">← もどる</button>
+    <h2 class="title">語彙予測コンボバトル</h2>
+    <p class="sub">空欄に入る言葉を予測。連続正解でコンボがつながり、表示は速くなる。1問でも間違えるとコンボは途切れる。</p>
+    <div class="card">
+      <div class="qmeta"><span>ベストコンボ</span><span class="num" id="vc-bestcombo" style="color:var(--accent)">0</span></div>
+      <div class="qmeta"><span>ベストスコア</span><span class="num" id="vc-bestscore" style="color:var(--accent)">0</span></div>
+    </div>
+    <button class="btn" onclick="vcStart()">スタート</button>
+  </section>
+
+  <section id="vc-play" class="screen">
+    <div class="combo"><div class="n num" id="vc-combo">0</div><div class="l">COMBO</div></div>
+    <div class="qmeta"><span class="num">SCORE <b id="vc-score" style="color:var(--accent)">0</b></span><span class="num" id="vc-qn">1 / 16</span></div>
+    <div class="tbar"><i id="vc-tbar"></i></div>
+    <div class="card">
+      <div class="sentence" id="vc-sentence"></div>
+      <div id="vc-opts"></div>
+    </div>
+  </section>
+
+  <section id="vc-result" class="screen">
+    <div class="card">
+      <div class="score-big num" id="vc-fscore">0</div>
+      <div class="score-lbl">SCORE</div>
+      <div id="vc-newbest"></div>
+      <div class="stats">
+        <div class="stat"><div class="v num" id="vc-maxcombo">0</div><div class="l">最大コンボ</div></div>
+        <div class="stat"><div class="v num" id="vc-correct">0</div><div class="l">正解数</div></div>
+        <div class="stat"><div class="v num" id="vc-rate">0%</div><div class="l">正答率</div></div>
+      </div>
+    </div>
+    <div class="row">
+      <button class="btn ghost" onclick="go('home')">ホーム</button>
+      <button class="btn" onclick="vcStart()">もう一度</button>
+    </div>
+  </section>
+
+  <!-- ======= VISION ======= -->
+  <section id="vs-start" class="screen">
+    <button class="back" onclick="go('home')">← もどる</button>
+    <h2 class="title">視野拡張アクション</h2>
+    <p class="sub">中央の点を見つめたまま、まわりに一瞬あらわれる単語を読み取る。目を動かさずに把握する“周辺視野”の訓練。正解するほど表示は速く・遠くなる。</p>
+    <div class="card">
+      <div class="qmeta"><span>ベストスコア</span><span class="num" id="vs-best" style="color:var(--accent)">0</span></div>
+      <p style="font-size:12.5px;color:var(--sub);margin:0">・中央の赤い点から目を離さない<br>・単語がパッと光ったら、何だったかを下の選択肢から選ぶ<br>・ミス3回で終了</p>
+    </div>
+    <button class="btn" onclick="vsStart()">スタート</button>
+  </section>
+
+  <section id="vs-play" class="screen">
+    <div class="vfield" id="vs-field">
+      <div class="vhud"><span class="num">SCORE <b id="vs-score" style="color:var(--accent)">0</b></span><span class="lives num" id="vs-lives">♥♥♥</span></div>
+      <div class="fix" id="vs-fix"></div>
+      <div class="vcenter" id="vs-center">中央の点を見て…</div>
+    </div>
+    <div id="vs-opts"></div>
+  </section>
+
+  <section id="vs-result" class="screen">
+    <div class="card">
+      <div class="score-big num" id="vs-fscore">0</div>
+      <div class="score-lbl">SCORE</div>
+      <div id="vs-newbest"></div>
+      <div class="stats">
+        <div class="stat"><div class="v num" id="vs-reached">Lv.1</div><div class="l">到達レベル</div></div>
+        <div class="stat"><div class="v num" id="vs-correct">0</div><div class="l">正解数</div></div>
+        <div class="stat"><div class="v num" id="vs-maxr">0px</div><div class="l">最大視野</div></div>
+      </div>
+    </div>
+    <div class="row">
+      <button class="btn ghost" onclick="go('home')">ホーム</button>
+      <button class="btn" onclick="vsStart()">もう一度</button>
+    </div>
+  </section>
+
+  <!-- ======= DAILY ======= -->
+  <section id="daily" class="screen">
+    <button class="back" onclick="go('home')">← もどる</button>
+    <h2 class="title">デイリークエスト</h2>
+    <p class="sub">毎日3つ。達成すると💎読書石と⚡スピードポイントがたまり、テーマを解放できる。日付が変わるとリセット。</p>
+    <div class="card" id="quest-list"></div>
+    <h2 class="title" style="margin-top:18px">背景テーマ</h2>
+    <p class="sub">読書石で解放。タップで切り替え。</p>
+    <div class="card"><div class="theme-grid" id="theme-list"></div></div>
+  </section>
+
+  <!-- ======= UNDER CONSTRUCTION ======= -->
+  <section id="soon" class="screen">
+    <button class="back" onclick="go('home')">← もどる</button>
+    <div class="card" style="text-align:center;padding:44px 18px">
+      <div style="font-size:44px">🚧</div>
+      <h2 class="title" id="soon-title" style="margin-top:10px">工事中</h2>
+      <p class="sub" id="soon-desc" style="margin-bottom:0">この機能は次回のバージョンアップで登場します。</p>
+    </div>
+  </section>
+
+</div>
+<div id="toast"></div>
+
+<script>
+"use strict";
+
+/* =========================================================
+   データ
+========================================================= */
+const STAGES = [
+  { id:"sprint", genre:"雑学", title:"コンビニの傘", diff:"Short Sprint",
+    text:"雨の日、コンビニでビニール傘を買った経験は誰にでもあるだろう。急な雨をしのぐのに便利なあの傘は、実は日本で生まれた発明だという。それまでの傘は布でできていて、中の様子が見えなかった。ビニールの傘なら、さしたまま前がよく見えるので、人にぶつかりにくい。透明であることが、ただのデザインではなく安全にもつながっているのだ。手軽で便利な道具の裏にも、小さな工夫がかくれている。",
+    quiz:[
+      {q:"ビニール傘はどこで生まれたとされる？", c:["日本","アメリカ","イギリス","中国"], a:0},
+      {q:"透明であることの利点は？", c:["前がよく見える","とても軽い","値段が安い","雨に強い"], a:0},
+      {q:"昔の傘は何でできていた？", c:["布","紙","ビニール","革"], a:0},
+    ]},
+  { id:"clock", genre:"雑学", title:"朝の光と体内時計", diff:"Normal",
+    text:"私たちの体には、目に見えない時計がそなわっている。体内時計と呼ばれるこの仕組みは、朝と夜のリズムを作り出し、眠気や体温、集中力の波を静かに調整している。ところが、この時計は放っておくと少しずつずれてしまう。一日の長さがきっかり二十四時間ではないからだ。そのずれを毎朝リセットしてくれるのが、太陽の光である。朝、窓辺で光を浴びると、脳が一日の始まりを判断し、時計の針をそろえ直す。反対に、夜おそくまで明るい画面を見つめていると、脳は昼だと勘違いし、眠りの訪れが遅れてしまう。よく眠り、日中を元気に過ごすためには、特別な道具はいらない。朝はカーテンを開けて光を取り込み、夜は明かりを少し落とす。それだけで、体の中の時計はゆっくりと整っていくのである。",
+    quiz:[
+      {q:"体内時計を毎朝リセットするものは？", c:["太陽の光","温かい飲み物","適度な運動","静かな音楽"], a:0},
+      {q:"夜おそくまで明るい画面を見ると脳はどう判断する？", c:["昼だと勘違いする","朝が来たと判断する","疲れを感じる","何も変わらない"], a:0},
+      {q:"一日の長さについて本文が述べていることは？", c:["きっかり24時間ではない","季節で大きく変わる","人によって違う","年々短くなる"], a:0},
+    ]},
+  { id:"cafe", genre:"小説", title:"小さな喫茶店", diff:"Normal",
+    text:"駅の裏通りに、小さな喫茶店があった。看板の文字はすっかり色あせ、知らなければ通り過ぎてしまうような店だ。私が初めて扉を押したのは、雨のひどい夕方だった。店内には古いレコードが低く流れ、窓ぎわの席にひとりの老人が座っていた。老人はコーヒーには手をつけず、ただ雨の落ちる窓の外をながめていた。マスターは何も言わず、私の前に湯気の立つカップを置いた。ひと口飲むと、体の芯がほどけていくようだった。それからというもの、私は仕事に疲れた日にこの店へ通うようになった。いつ行っても、あの老人は同じ席にいた。ある雨の日、思いきって声をかけると、老人は静かに笑って言った。ここはね、時間がゆっくり流れるんだ、と。たしかに、この店の中だけ、外の忙しさとは別の時が流れているようだった。",
+    quiz:[
+      {q:"「私」が初めて店に入ったのはどんな日？", c:["雨のひどい夕方","よく晴れた朝","雪の降る夜","風の強い昼"], a:0},
+      {q:"老人は店で何をしていた？", c:["窓の外をながめていた","新聞を読んでいた","マスターと話していた","本を書いていた"], a:0},
+      {q:"老人が言った言葉は？", c:["時間がゆっくり流れる","コーヒーがおいしい","雨はもうすぐやむ","また来るといい"], a:0},
+    ]},
+  { id:"meeting", genre:"ビジネス", title:"会議を短くする工夫", diff:"Technical",
+    text:"会議が長引くのには、いくつかの決まった原因がある。まず、その日に何を決めるのかがはっきりしていないことだ。目的があいまいなまま人が集まると、話はあちこちに広がり、なかなか結論にたどり着かない。次に、資料を会議の場で初めて配ることだ。参加者はその場で読み始めるため、貴重な時間が黙読に費やされてしまう。これを防ぐには、資料を前日までに共有し、読んでから集まるようにすればよい。さらに、終わりの時刻をあらかじめ決めておくことも効果的である。制限時間があると、人は自然と要点を先に話すようになる。最後に、決まったことと次にやるべきことを、その場で短くまとめて共有する。こうしたひと工夫を重ねるだけで、会議は驚くほど引き締まり、参加者の集中も長く続くのである。",
+    quiz:[
+      {q:"会議が長引く原因として最初に挙げられたのは？", c:["何を決めるか明確でない","参加者が多すぎる","部屋がせまい","時間帯が悪い"], a:0},
+      {q:"資料はいつ共有するとよい？", c:["前日までに","会議の直前に","会議の場で","会議のあとに"], a:0},
+      {q:"終わりの時刻を決めると人はどうなる？", c:["要点を先に話す","発言を控える","遅刻しなくなる","資料を増やす"], a:0},
+    ]},
+];
+
+const VOCAB = [
+  {s:["外は激しい雨だった。","、試合は中止になった。"], c:["だから","しかし","たとえば","ところで"], a:0},
+  {s:["彼はよく勉強した。","、成績はなかなか伸びなかった。"], c:["しかし","だから","つまり","さらに"], a:0},
+  {s:["この道は近い。","、少し暗くて危ない。"], c:["ただし","だから","つまり","なぜなら"], a:0},
+  {s:["電車が遅れた。","、彼は会議に間に合わなかった。"], c:["その結果","しかし","たとえば","一方で"], a:0},
+  {s:["彼女は歌が得意だ。","、絵もうまい。"], c:["しかも","しかし","ただし","なぜなら"], a:0},
+  {s:["値段は高い。","、品質はとてもよい。"], c:["そのかわり","だから","つまり","それゆえ"], a:0},
+  {s:["朝は晴れていた。","、午後から雨になった。"], c:["ところが","だから","つまり","すると"], a:0},
+  {s:["まず材料を切る。","、鍋でいためる。"], c:["次に","しかし","なぜなら","ただし"], a:0},
+  {s:["彼は疲れきっていた。","、最後まで走りきった。"], c:["それでも","だから","つまり","さらに"], a:0},
+  {s:["準備は完璧だった。","、結果は成功だった。"], c:["したがって","しかし","ところが","ただし"], a:0},
+  {s:["のどが渇いたので、冷たい","を一気に飲んだ。"], c:["水","本","鉛筆","椅子"], a:0},
+  {s:["冬になると、山には白い","が積もる。"], c:["雪","花","波","砂"], a:0},
+  {s:["手紙を書いたので、","を貼ってポストに入れた。"], c:["切手","電池","定規","皿"], a:0},
+  {s:["暗くなったので、部屋の","をつけた。"], c:["電気","窓","鍵","傘"], a:0},
+  {s:["料理の味が薄いので、少し","を足した。"], c:["塩","砂","氷","水"], a:0},
+  {s:["遠くの文字が見えないので、","をかけた。"], c:["眼鏡","手袋","帽子","マフラー"], a:0},
+];
+
+const VISION_WORDS = ["空","海","山","川","花","星","月","犬","猫","鳥","本","水","火","風","光","音","道","森","雨","雪","朝","夜","町","雲","石","木","駅","橋","船","旗","春","秋","湖","岸","岩","泉"];
+
+const MENU = [
+  {no:"01",ic:"⚡",tt:"スピードラン読書",ds:"タイムアタック",go:"sr-stages"},
+  {no:"02",ic:"🔤",tt:"語彙予測コンボ",ds:"連続正解バトル",go:"vc-start"},
+  {no:"03",ic:"👀",tt:"視野拡張アクション",ds:"周辺視野トレ",go:"vs-start"},
+  {no:"04",ic:"🏆",tt:"デイリークエスト",ds:"毎日3つの挑戦",go:"daily"},
+  {no:"05",ic:"📚",tt:"読書RPG",ds:"物語が進む",soon:true},
+  {no:"06",ic:"🧠",tt:"集中力ゲージ",ds:"集中管理システム",soon:true},
+  {no:"07",ic:"🎨",tt:"アバター育成",ds:"読むほど成長",soon:true},
+  {no:"08",ic:"🔮",tt:"AI難易度調整",ds:"弱点を自動分析",soon:true},
+];
+
+const THEMES = [
+  {id:"default", name:"スタンダード", cost:0, sw:"linear-gradient(90deg,#f6f7f9,#2f5d8f)"},
+  {id:"sakura",  name:"さくら",      cost:3, sw:"linear-gradient(90deg,#fdf6f8,#c25d84)"},
+  {id:"wakaba",  name:"若葉",        cost:6, sw:"linear-gradient(90deg,#f4faf6,#2f9e6f)"},
+  {id:"yozora",  name:"夜空",        cost:10,sw:"linear-gradient(90deg,#141824,#7aa7d8)"},
+];
+
+/* =========================================================
+   ストア（localStorage）
+========================================================= */
+const KEY = "sokudoku_v1";
+function todayStr(){ const d=new Date(); return d.getFullYear()+"-"+(d.getMonth()+1)+"-"+d.getDate(); }
+function freshDaily(){ return { date:todayStr(), sr:false, vs:false, vocabCount:0, claimed:{sr:false,vs:false,vc:false,bonus:false} }; }
+let S = load();
+
+function load(){
+  let d;
+  try{ d = JSON.parse(localStorage.getItem(KEY)) || {}; }catch(e){ d = {}; }
+  d.gems = d.gems || 0;
+  d.sp = d.sp || 0;
+  d.rank = d.rank || {};              // stageId -> [{n,t,a,s}]
+  d.vc = d.vc || {bestCombo:0,bestScore:0};
+  d.vs = d.vs || {best:0};
+  d.themes = d.themes || {unlocked:["default"], current:"default"};
+  d.daily = d.daily || freshDaily();
+  if(d.daily.date !== todayStr()) d.daily = freshDaily();
+  return d;
+}
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} }
+
+/* =========================================================
+   共通ユーティリティ
+========================================================= */
+const $ = id => document.getElementById(id);
+function go(name){
+  document.querySelectorAll(".screen").forEach(s=>s.classList.remove("on"));
+  $(name).classList.add("on");
+  window.scrollTo(0,0);
+  if(name==="home") renderHome();
+  if(name==="daily") renderDaily();
+  if(name==="sr-stages") renderStages();
+}
+function shuffle(a){ a=a.slice(); for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+let toastTimer;
+function toast(msg){
+  const t=$("toast"); t.textContent=msg; t.classList.add("show");
+  clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove("show"),1900);
+}
+function applyTheme(){ document.body.dataset.theme = S.themes.current; }
+function grant(gems,sp){ S.gems+=gems; S.sp+=sp; save(); }
+
+/* =========================================================
+   ホーム
+========================================================= */
+function renderHome(){
+  applyTheme();
+  $("w-gems").textContent = S.gems;
+  $("w-sp").textContent = S.sp;
+  const d=S.daily;
+  const done=[d.sr, d.vocabCount>=10, d.vs].filter(Boolean).length;
+  $("daily-frac").textContent = done+"/3";
+  $("daily-bar").style.width = (done/3*100)+"%";
+}
+function buildMenu(){
+  $("menu").innerHTML = MENU.map((m,i)=>
+    `<button class="tile ${m.soon?"soon":""}" data-i="${i}">
+      <div class="no">${m.no}</div><div class="ic">${m.ic}</div>
+      <div class="tt">${m.tt}</div><div class="ds">${m.ds}</div>
+    </button>`).join("");
+  document.querySelectorAll("#menu .tile").forEach(el=>{
+    el.addEventListener("click",()=>{
+      const m=MENU[+el.dataset.i];
+      if(m.soon){ $("soon-title").textContent=m.tt; $("soon-desc").textContent="この機能は次回のバージョンアップで登場します。"; go("soon"); }
+      else go(m.go);
+    });
+  });
+}
+
+/* =========================================================
+   デイリークエスト
+========================================================= */
+function checkDaily(){
+  const d=S.daily;
+  const defs=[
+    {k:"sr", done:d.sr, name:"スピードラン読書を1回クリア", prog:d.sr?"達成":"未達成"},
+    {k:"vc", done:d.vocabCount>=10, name:"語彙予測を10問こなす", prog:Math.min(d.vocabCount,10)+" / 10 問"},
+    {k:"vs", done:d.vs, name:"視野拡張ゲームを1回プレイ", prog:d.vs?"達成":"未達成"},
+  ];
+  defs.forEach(q=>{
+    if(q.done && !d.claimed[q.k]){
+      d.claimed[q.k]=true; grant(2,100); toast("クエスト達成！ 💎+2 ⚡+100");
+    }
+  });
+  if(defs.every(q=>q.done) && !d.claimed.bonus){
+    d.claimed.bonus=true; grant(5,300); toast("全達成ボーナス！ 💎+5 ⚡+300");
+  }
+  save();
+  return defs;
+}
+function renderDaily(){
+  const defs=checkDaily();
+  $("quest-list").innerHTML = defs.map(q=>
+    `<div class="quest">
+      <div class="qcheck ${q.done?"done":""}">${q.done?"✓":""}</div>
+      <div class="qm"><div class="qt">${q.name}</div><div class="qp">${q.prog}</div></div>
+      <div class="rw">💎2 ⚡100</div>
+    </div>`).join("");
+  $("theme-list").innerHTML = THEMES.map(t=>{
+    const unlocked=S.themes.unlocked.includes(t.id);
+    const cur=S.themes.current===t.id;
+    return `<div class="theme ${cur?"cur":""} ${unlocked?"":"lock"}" data-t="${t.id}">
+      <div class="sw" style="background:${t.sw}"></div>
+      <div class="tn">${t.name}</div>
+      <div class="tl">${unlocked?(cur?"使用中":"タップで使用"):"💎"+t.cost+" で解放"}</div>
+    </div>`;
+  }).join("");
+  document.querySelectorAll("#theme-list .theme").forEach(el=>{
+    el.addEventListener("click",()=>onTheme(el.dataset.t));
+  });
+  renderHome();
+}
+function onTheme(id){
+  const t=THEMES.find(x=>x.id===id);
+  if(S.themes.unlocked.includes(id)){ S.themes.current=id; save(); applyTheme(); renderDaily(); return; }
+  if(S.gems>=t.cost){
+    S.gems-=t.cost; S.themes.unlocked.push(id); S.themes.current=id; save(); applyTheme();
+    toast(t.name+" を解放！"); renderDaily();
+  } else {
+    toast("読書石が足りません（💎"+t.cost+" 必要）");
+  }
+}
+
+/* =========================================================
+   1. スピードラン読書
+========================================================= */
+let sr = {};
+function renderStages(){
+  $("sr-stage-list").innerHTML = STAGES.map((st,i)=>{
+    const best=(S.rank[st.id]&&S.rank[st.id][0])?("Best "+S.rank[st.id][0].s):"未挑戦";
+    return `<div class="stage" data-i="${i}">
+      <div class="m"><div class="st">${st.title}</div><div class="sd">${st.diff}・約${st.text.length}字</div></div>
+      <div style="text-align:right"><div class="genre">${st.genre}</div><div class="best" style="margin-top:4px">${best}</div></div>
+    </div>`;
+  }).join("");
+  document.querySelectorAll("#sr-stage-list .stage").forEach(el=>{
+    el.addEventListener("click",()=>srPlay(+el.dataset.i));
+  });
+}
+function splitBlocks(text){
+  const parts = text.split("。").filter(x=>x.length).map(x=>x+"。");
+  const blocks=[];
+  for(let i=0;i<parts.length;i+=2){ blocks.push(parts.slice(i,i+2).join("")); }
+  return blocks;
+}
+function srPlay(i){
+  const st=STAGES[i];
+  sr={ stage:st, blocks:splitBlocks(st.text), idx:0, start:0, readMs:0, qi:0, correct:0, tId:null };
+  go("sr-read");
+  $("sr-dots").innerHTML = sr.blocks.map(()=>`<i></i>`).join("");
+  showBlock();
+  sr.start=performance.now();
+  sr.tId=setInterval(()=>{
+    const t=(performance.now()-sr.start)/1000;
+    $("sr-timer").textContent=t.toFixed(2);
+  },33);
+  $("sr-timer").classList.remove("stop");
+}
+function showBlock(){
+  $("sr-reader").innerHTML=`<div class="blk">${sr.blocks[sr.idx]}</div>`;
+  const dots=$("sr-dots").children;
+  for(let i=0;i<dots.length;i++) dots[i].classList.toggle("done", i<sr.idx);
+}
+function srNext(){
+  sr.idx++;
+  const dots=$("sr-dots").children;
+  if(sr.idx>=sr.blocks.length){
+    clearInterval(sr.tId);
+    sr.readMs=performance.now()-sr.start;
+    for(let i=0;i<dots.length;i++) dots[i].classList.add("done");
+    $("sr-timer").classList.add("stop");
+    setTimeout(srQuiz,350);
+  } else showBlock();
+}
+function srQuiz(){
+  sr.qi=0; sr.correct=0;
+  go("sr-quiz"); showQ();
+}
+function showQ(){
+  const q=sr.stage.quiz[sr.qi];
+  $("sr-qcount").textContent=(sr.qi+1)+" / "+sr.stage.quiz.length;
+  $("sr-q").textContent=q.q;
+  const order=shuffle(q.c.map((c,i)=>({c,i})));
+  $("sr-opts").innerHTML=order.map((o,k)=>`<button class="opt" data-i="${o.i}" data-k="${k}">${o.c}</button>`).join("");
+  document.querySelectorAll("#sr-opts .opt").forEach(el=>{
+    el.addEventListener("click",()=>srAnswer(+el.dataset.i, el));
+  });
+}
+function srAnswer(chosen, el){
+  const q=sr.stage.quiz[sr.qi];
+  const opts=document.querySelectorAll("#sr-opts .opt");
+  opts.forEach(o=>{ o.disabled=true; if(+o.dataset.i===q.a) o.classList.add("correct"); });
+  if(chosen===q.a) sr.correct++; else el.classList.add("wrong");
+  setTimeout(()=>{
+    sr.qi++;
+    if(sr.qi>=sr.stage.quiz.length) srFinish(); else showQ();
+  },700);
+}
+function srFinish(){
+  const sec=sr.readMs/1000;
+  const acc=sr.correct/sr.stage.quiz.length;
+  // 案1: Score = 10000/秒 × (0.6 + 0.4 × 正答率)
+  const score=Math.round(10000/sec*(0.6+0.4*acc));
+  const chars=sr.stage.text.length;
+  const wpm=Math.round(chars/(sec/60));
+
+  $("sr-score").textContent=score;
+  $("sr-time").textContent=sec.toFixed(1)+"s";
+  $("sr-acc").textContent=Math.round(acc*100)+"%";
+  $("sr-wpm").textContent=wpm;
+  $("sr-genre").textContent=sr.stage.genre;
+
+  // ランキング
+  const list=S.rank[sr.stage.id]||[];
+  const prevBest=list[0]?list[0].s:0;
+  list.push({n:"YOU", t:sec.toFixed(2), a:Math.round(acc*100), s:score});
+  list.sort((x,y)=>y.s-x.s);
+  S.rank[sr.stage.id]=list.slice(0,8);
+  $("sr-newbest").innerHTML = score>prevBest ? `<div class="newbest">★ ベスト更新！</div>` : "";
+  renderSrRank();
+
+  // 報酬・デイリー
+  grant(0, Math.round(score/10));
+  S.daily.sr=true; save();
+  checkDaily();
+  $("sr-retry").onclick=()=>srPlay(STAGES.indexOf(sr.stage));
+  go("sr-result");
+}
+function renderSrRank(){
+  const list=S.rank[sr.stage.id]||[];
+  $("sr-rank").innerHTML=list.map((r,i)=>
+    `<div class="rk">
+      <span class="p ${i===0?"top":""}">${i+1}</span>
+      <span class="t">${r.t}s</span>
+      <span class="a">${r.a}%</span>
+      <span class="s">${r.s}</span>
+    </div>`).join("");
+}
+
+/* =========================================================
+   2. 語彙予測コンボバトル
+========================================================= */
+let vc={};
+function vcStart(){
+  vc={ queue:shuffle(VOCAB), i:0, combo:0, maxCombo:0, score:0, correct:0, limit:6000, tId:null, deadline:0 };
+  go("vc-play");
+  vcQ();
+}
+function vcQ(){
+  clearInterval(vc.tId);
+  const item=vc.queue[vc.i];
+  $("vc-qn").textContent=(vc.i+1)+" / "+vc.queue.length;
+  $("vc-score").textContent=vc.score;
+  $("vc-combo").textContent=vc.combo;
+  const blank=`<span class="blank">?</span>`;
+  $("vc-sentence").innerHTML = item.s[0]+blank+(item.s[1]||"");
+  const order=shuffle(item.c.map((c,i)=>({c,i})));
+  $("vc-opts").innerHTML=order.map(o=>`<button class="opt" data-i="${o.i}">${o.c}</button>`).join("");
+  document.querySelectorAll("#vc-opts .opt").forEach(el=>{
+    el.addEventListener("click",()=>vcAnswer(+el.dataset.i, el));
+  });
+  // 制限時間バー（コンボが伸びるほど短く）
+  vc.limit=Math.max(2600, 6000-vc.combo*250);
+  vc.deadline=performance.now()+vc.limit;
+  const bar=$("vc-tbar"); bar.style.transition="none"; bar.style.width="100%";
+  void bar.offsetWidth;
+  bar.style.transition="width "+vc.limit+"ms linear"; bar.style.width="0%";
+  vc.tId=setInterval(()=>{ if(performance.now()>=vc.deadline){ vcAnswer(-1,null); } },40);
+}
+function vcAnswer(chosen, el){
+  clearInterval(vc.tId);
+  const item=vc.queue[vc.i];
+  const opts=document.querySelectorAll("#vc-opts .opt");
+  opts.forEach(o=>{ o.disabled=true; if(+o.dataset.i===item.a) o.classList.add("correct"); });
+  if(chosen===item.a){
+    if(el) el.classList.remove("wrong");
+    vc.correct++; vc.combo++; vc.maxCombo=Math.max(vc.maxCombo,vc.combo);
+    vc.score += 10 + vc.combo*5;
+    const n=$("vc-combo"); n.textContent=vc.combo; n.classList.add("pop"); setTimeout(()=>n.classList.remove("pop"),150);
+  } else {
+    if(el) el.classList.add("wrong");
+    vc.combo=0;
+  }
+  $("vc-score").textContent=vc.score;
+  S.daily.vocabCount++; save();
+  setTimeout(()=>{
+    vc.i++;
+    if(vc.i>=vc.queue.length) vcFinish(); else vcQ();
+  }, 650);
+}
+function vcFinish(){
+  clearInterval(vc.tId);
+  $("vc-fscore").textContent=vc.score;
+  $("vc-maxcombo").textContent=vc.maxCombo;
+  $("vc-correct").textContent=vc.correct+"/"+vc.queue.length;
+  $("vc-rate").textContent=Math.round(vc.correct/vc.queue.length*100)+"%";
+  let nb="";
+  if(vc.score>S.vc.bestScore){ S.vc.bestScore=vc.score; nb="スコア更新！"; }
+  if(vc.maxCombo>S.vc.bestCombo){ S.vc.bestCombo=vc.maxCombo; nb=nb?"スコア＆コンボ更新！":"コンボ更新！"; }
+  $("vc-newbest").innerHTML = nb?`<div class="newbest">★ ${nb}</div>`:"";
+  grant(0, Math.round(vc.score/8));
+  checkDaily(); save();
+  go("vc-result");
+}
+
+/* =========================================================
+   3. 視野拡張アクション
+========================================================= */
+let vs={};
+function vsStart(){
+  vs={ level:1, score:0, lives:3, correct:0, maxR:0, flashMs:750, target:null, waiting:false };
+  go("vs-play");
+  $("vs-fix").classList.remove("calm");
+  updateVsHud();
+  setTimeout(vsRound, 500);
+}
+function updateVsHud(){
+  $("vs-score").textContent=vs.score;
+  $("vs-lives").textContent="♥".repeat(vs.lives)+"♡".repeat(3-vs.lives);
+}
+function vsRound(){
+  vs.waiting=false;
+  $("vs-opts").innerHTML="";
+  const center=$("vs-center"); center.style.display="block"; center.textContent="中央の点を見て…";
+  const words=shuffle(VISION_WORDS);
+  vs.target=words[0];
+  vs.choices=shuffle([words[0],words[1],words[2],words[3]]);
+  // 半径はレベルで拡大
+  const field=$("vs-field");
+  const w=field.clientWidth, h=field.clientHeight;
+  const maxR=Math.min(w,h)/2-40;
+  const r=Math.min(maxR, 70 + vs.level*8);
+  vs.maxR=Math.max(vs.maxR, Math.round(r));
+  const ang=Math.random()*Math.PI*2;
+  const cx=w/2 + Math.cos(ang)*r;
+  const cy=h/2 + Math.sin(ang)*r;
+  setTimeout(()=>{
+    center.style.display="none";
+    const el=document.createElement("div");
+    el.className="flashword"; el.textContent=vs.target;
+    el.style.left=cx+"px"; el.style.top=cy+"px";
+    field.appendChild(el);
+    vs.flashMs=Math.max(240, 780 - vs.level*35);
+    setTimeout(()=>{
+      el.remove();
+      vsChoices();
+    }, vs.flashMs);
+  }, 700);
+}
+function vsChoices(){
+  vs.waiting=true;
+  $("vs-center").style.display="block";
+  $("vs-center").textContent="何が見えた？";
+  $("vs-opts").innerHTML=`<div class="row" style="margin-bottom:10px">`+
+    vs.choices.slice(0,2).map(c=>`<button class="opt" style="text-align:center;margin:0" data-c="${c}">${c}</button>`).join("")+
+    `</div><div class="row">`+
+    vs.choices.slice(2,4).map(c=>`<button class="opt" style="text-align:center;margin:0" data-c="${c}">${c}</button>`).join("")+
+    `</div>`;
+  document.querySelectorAll("#vs-opts .opt").forEach(el=>{
+    el.addEventListener("click",()=>vsAnswer(el.dataset.c));
+  });
+}
+function vsAnswer(choice){
+  if(!vs.waiting) return; vs.waiting=false;
+  if(choice===vs.target){
+    vs.correct++; vs.level++; vs.score += 10 + vs.level;
+    $("vs-fix").classList.add("calm"); setTimeout(()=>$("vs-fix").classList.remove("calm"),200);
+    updateVsHud();
+    setTimeout(vsRound, 350);
+  } else {
+    vs.lives--; updateVsHud();
+    const f=$("vs-field");
+    if(f.animate) f.animate([{transform:"translateX(0)"},{transform:"translateX(-7px)"},{transform:"translateX(7px)"},{transform:"translateX(0)"}],{duration:220});
+    if(vs.lives<=0) setTimeout(vsFinish,300);
+    else { $("vs-center").textContent="正解は「"+vs.target+"」"; setTimeout(vsRound,900); }
+  }
+}
+function vsFinish(){
+  $("vs-fscore").textContent=vs.score;
+  $("vs-reached").textContent="Lv."+vs.level;
+  $("vs-correct").textContent=vs.correct;
+  $("vs-maxr").textContent=vs.maxR+"px";
+  let nb="";
+  if(vs.score>S.vs.best){ S.vs.best=vs.score; nb="スコア更新！"; }
+  $("vs-newbest").innerHTML = nb?`<div class="newbest">★ ${nb}</div>`:"";
+  grant(0, Math.round(vs.score/6));
+  S.daily.vs=true; save(); checkDaily();
+  go("vs-result");
+}
+
+/* =========================================================
+   起動
+========================================================= */
+document.addEventListener("keydown",e=>{
+  if($("sr-read").classList.contains("on") && (e.code==="Space"||e.code==="ArrowRight"||e.code==="Enter")){
+    e.preventDefault(); srNext();
+  }
+});
+function refreshBestLabels(){
+  $("vc-bestcombo").textContent=S.vc.bestCombo;
+  $("vc-bestscore").textContent=S.vc.bestScore;
+  $("vs-best").textContent=S.vs.best;
+}
+// スタート画面表示時にベスト更新
+const _go=go;
+go=function(n){ _go(n); if(n==="vc-start"||n==="vs-start") refreshBestLabels(); };
+
+buildMenu();
+applyTheme();
+renderHome();
+</script>
+</body>
+</html>
