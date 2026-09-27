@@ -142,8 +142,12 @@
   .combo .l{font-size:11px;color:var(--sub);letter-spacing:.25em;font-weight:700}
   .tbar{height:6px;background:var(--accent-soft);border-radius:999px;overflow:hidden;margin:14px 0}
   .tbar>i{display:block;height:100%;background:var(--accent);width:100%}
-  .sentence{font-size:19px;line-height:2;text-align:center;margin:8px 0 18px;min-height:76px;display:flex;align-items:center;justify-content:center}
-  .blank{display:inline-block;min-width:64px;border-bottom:3px solid var(--accent);margin:0 4px;vertical-align:bottom}
+  .sentence{margin:4px 0 16px;display:flex;flex-direction:column;gap:10px;min-height:76px}
+  .vc-part{position:relative;font-size:18px;line-height:1.85;padding:14px 15px;border-radius:12px;background:var(--bg);border:1px solid var(--line);font-weight:600;text-align:left}
+  .vc-tag{display:block;font-size:10px;font-weight:800;letter-spacing:.12em;color:var(--faint);margin-bottom:5px}
+  .vc-slot{display:flex;flex-direction:row;align-items:center;justify-content:center;gap:8px;align-self:center;width:55%;min-width:172px;padding:9px 14px;border-radius:12px;background:var(--accent-soft);border:2px dashed var(--accent);white-space:nowrap}
+  .vc-slot .lab{font-size:11px;font-weight:800;letter-spacing:.04em;color:var(--accent)}
+  .vc-blank{font-size:22px;font-weight:900;color:var(--accent);line-height:1}
 
   /* vision game */
   .vfield{position:relative;height:340px;background:var(--card);border:1px solid var(--line);border-radius:16px;overflow:hidden;box-shadow:var(--shadow);margin-bottom:12px}
@@ -200,7 +204,7 @@
       <div class="bar"><i id="daily-bar" style="width:0%"></i></div>
     </div>
 
-    <a class="landlink" href="https://pecpec37-gift.github.io/portal/">← ポータルサイトに戻る</a>
+    <a class="landlink" href="https://pecpec37-gift.github.io/portal/">← とみやんのゲームランドへ</a>
   </section>
 
   <!-- ======= SPEEDRUN: stage select ======= -->
@@ -906,8 +910,12 @@ function vcQ(){
   $("vc-qn").textContent=(vc.i+1)+" / "+vc.queue.length;
   $("vc-score").textContent=vc.score;
   $("vc-combo").textContent=vc.combo;
-  const blank=`<span class="blank">?</span>`;
-  $("vc-sentence").innerHTML = item.s[0]+blank+(item.s[1]||"");
+  const left=(item.s[0]||"").trim();
+  const right=(item.s[1]||"").trim();
+  $("vc-sentence").innerHTML =
+    `<div class="vc-part vc-left"><span class="vc-tag">前半</span>${left}</div>`+
+    `<div class="vc-slot"><span class="lab">ここに入る言葉は？</span><span class="vc-blank">？</span></div>`+
+    (right?`<div class="vc-part vc-right"><span class="vc-tag">後半</span>${right}</div>`:"");
   const order=shuffle(item.c.map((c,i)=>({c,i})));
   $("vc-opts").innerHTML=order.map(o=>`<button class="opt" data-i="${o.i}">${o.c}</button>`).join("");
   document.querySelectorAll("#vc-opts .opt").forEach(el=>{
